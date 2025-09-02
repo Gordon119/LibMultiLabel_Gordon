@@ -73,6 +73,25 @@ class TorchTrainer:
 
         self.config.multiclass = is_multiclass_dataset(self.datasets["train"] + self.datasets.get("val", list()))
 
+        # Ensemble
+        self.sample_rate = config.sample_rate
+        logging.info(f"Sample Rate: {self.sample_rate}")
+        classes = data_utils.load_or_build_label(
+                    self.datasets, self.config.label_file, self.config.include_test_labels
+                )
+        if self.config.ensemble and self.sample_rate:
+            self.indices = self.subsample_indices(len(classes), self.sample_rate)
+            self.classes = [classes[i] for i in self.indices]
+            classes_set = set(self.classes)
+            for split_name in list(self.datasets.keys()):
+                filtered_data = []                
+                for sample in self.datasets[split_name]:
+                    filtered_labels = [label for label in sample["label"] if label in classes_set]
+                    new_sample = sample.copy()
+                    new_sample["label"] = filtered_labels
+                    filtered_data.append(new_sample)
+                self.datasets[split_name] = filtered_data
+
         if self.config.model_name.lower() == "attentionxml":
             # Note that AttentionXML produces two models. checkpoint_path directs to model_1
             if config.checkpoint_path is None:
@@ -130,6 +149,20 @@ class TorchTrainer:
         )
         callbacks = [callback for callback in self.trainer.callbacks if isinstance(callback, ModelCheckpoint)]
         self.checkpoint_callback = callbacks[0] if callbacks else None
+
+    def subsample_indices(self, n_labels, sample_rate, random_seed=None):
+        if random_seed is not None:
+            np.random.seed(random_seed)
+        
+        n_select = int(n_labels * sample_rate)
+        
+        if n_select == 0:
+            raise ValueError(f"Sample rate {sample_rate} results in 0 labels selected")
+        if n_select > n_labels:
+            n_select = n_labels
+            
+        indices = np.random.choice(n_labels, n_select, replace=False)
+        return np.sort(indices).tolist()
 
     def _setup_model(
         self,
@@ -268,7 +301,9 @@ class TorchTrainer:
                 "No model is saved during training. \
                 If you want to save the best and the last model, please set `save_checkpoints` to True."
             )
-
+        if self.config.ensemble and self.sample_rate:
+            self.config.indices = self.indices
+            print(f"Kept indices:{self.config.indices}")
         dump_log(self.log_path, config=self.config)
 
         # return best model score for ray
@@ -298,6 +333,14 @@ class TorchTrainer:
 
         dump_log(self.log_path, config=self.config)
         return metric_dict
+
+    def test_ensemble(self):
+        assert "test" in self.datasets and self.trainer is not None
+        logging.info("Ensembled Testing on test set.")
+        test_loader = self._get_dataset_loader(split="test")
+        batch_predictions = self.trainer.predict(self.model, dataloaders=test_loader)        
+        np.savez_compressed(os.path.join(self.checkpoint_dir, "data.npz"), batch_predictions)
+        print("Prediction Saved!")
 
     def _save_predictions(self, dataloader, predict_out_path):
         """Save top k label results.

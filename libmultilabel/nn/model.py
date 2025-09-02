@@ -157,11 +157,12 @@ class MultiLabelModel(L.LightningModule):
         """
         pred_logits = self(batch)
         pred_scores = pred_logits.detach().cpu().numpy()
-        k = self.save_k_predictions
-        top_k_idx = argsort_top_k(pred_scores, k, axis=1)
-        top_k_scores = np.take_along_axis(pred_scores, top_k_idx, axis=1)
+        # k = self.save_k_predictions
+        # top_k_idx = argsort_top_k(pred_scores, k, axis=1)
+        # top_k_scores = np.take_along_axis(pred_scores, top_k_idx, axis=1)
 
-        return {"top_k_pred": top_k_idx, "top_k_pred_scores": top_k_scores}
+        # return {"top_k_pred": top_k_idx, "top_k_pred_scores": top_k_scores}
+        return {"pred_scores": pred_scores}
 
     def forward(self, batch):
         """Compute predicted logits."""

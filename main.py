@@ -17,6 +17,17 @@ def add_all_arguments(parser):
     )
 
     # data
+    parser.add_argument(
+        "--sample_rate",
+        type=float,
+        default=None,
+        help="Sample Rate.",
+    )
+    parser.add_argument(
+        "--ensemble",
+        action="store_true",
+        help="Run ensemble or not.",
+    )
     parser.add_argument("--data_name", default="unnamed_data", help="Dataset name (default: %(default)s)")
     parser.add_argument("--training_file", help="Path to training data (default: %(default)s)")
     parser.add_argument("--val_file", help="Path to validation data (default: %(default)s)")
@@ -325,7 +336,9 @@ def main():
         if not config.eval:
             trainer.train()
         # test
-        if "test" in trainer.datasets:
+        if config.ensemble:
+            trainer.test_ensemble()
+        elif "test" in trainer.datasets:
             trainer.test()
 
     collected_logs = collect_handler.get_logs()
