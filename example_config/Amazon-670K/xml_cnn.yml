@@ -1,4 +1,7 @@
 # data
+training_file: data/amazon-670k/train.txt
+test_file: data/amazon-670k/test.txt
+data_name: amazon-670k
 min_vocab_freq: 1
 max_seq_length: 500
 
@@ -7,7 +10,7 @@ max_seq_length: 500
 epochs: 50
 batch_size: 64
 optimizer: adam
-learning_rate: 0.0005
+learning_rate: 0.001
 weight_decay: 0
 patience: 5
 shuffle: true
@@ -20,12 +23,13 @@ val_size: 0.2
 
 # model
 model_name: XMLCNN
+init_weight: kaiming_uniform
 network_config:
-  embed_dropout: 0.2
+  embed_dropout: 0.4
   post_encoder_dropout: 0.2
-  filter_sizes: [2, 4, 8]
+  filter_sizes: [8]
   hidden_dim: 512
-  num_filter_per_size: 256  # filter channels
+  num_filter_per_size: 384  # filter channels
   num_pool: 2
 
 # pretrained vocab / embeddings

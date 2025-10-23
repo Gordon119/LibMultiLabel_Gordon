@@ -1,8 +1,10 @@
 import logging
 import os
 import pickle
+from tqdm import tqdm
 
 import numpy as np
+from scipy import sparse
 from lightning.pytorch.callbacks import ModelCheckpoint
 from transformers import AutoTokenizer
 
@@ -84,10 +86,14 @@ class TorchTrainer:
             self.classes = [classes[i] for i in self.indices]
             classes_set = set(self.classes)
             for split_name in list(self.datasets.keys()):
+                if split_name == "test":
+                    continue
                 filtered_data = []                
                 for sample in self.datasets[split_name]:
                     filtered_labels = [label for label in sample["label"] if label in classes_set]
                     new_sample = sample.copy()
+                    if filtered_labels == []:
+                        continue
                     new_sample["label"] = filtered_labels
                     filtered_data.append(new_sample)
                 self.datasets[split_name] = filtered_data
@@ -150,10 +156,7 @@ class TorchTrainer:
         callbacks = [callback for callback in self.trainer.callbacks if isinstance(callback, ModelCheckpoint)]
         self.checkpoint_callback = callbacks[0] if callbacks else None
 
-    def subsample_indices(self, n_labels, sample_rate, random_seed=None):
-        if random_seed is not None:
-            np.random.seed(random_seed)
-        
+    def subsample_indices(self, n_labels, sample_rate):
         n_select = int(n_labels * sample_rate)
         
         if n_select == 0:
@@ -337,10 +340,32 @@ class TorchTrainer:
     def test_ensemble(self):
         assert "test" in self.datasets and self.trainer is not None
         logging.info("Ensembled Testing on test set.")
+
         test_loader = self._get_dataset_loader(split="test")
-        batch_predictions = self.trainer.predict(self.model, dataloaders=test_loader)        
-        np.savez_compressed(os.path.join(self.checkpoint_dir, "data.npz"), batch_predictions)
-        print("Prediction Saved!")
+        batch_predictions = self.trainer.predict(self.model, dataloaders=test_loader)
+
+        if not self.config.eval:
+            os.makedirs(os.path.join(self.checkpoint_dir, "preds"), exist_ok=True)
+
+        top_k = 10000
+        for idx, batch in enumerate(tqdm(batch_predictions)):
+            scores = np.array(batch["pred_scores"])
+            # Get top-K indices and values per row
+            K = min(top_k, scores.shape[1])
+            top_idx = np.argpartition(scores, -K, axis=1)[:, -K:]
+            top_val = np.take_along_axis(scores, top_idx, axis=1)
+
+            # Build sparse matrix
+            rows = np.repeat(np.arange(scores.shape[0]), K)
+            cols = top_idx.reshape(-1)
+            data = top_val.reshape(-1)
+            mat = sparse.csr_matrix((data, (rows, cols)), shape=scores.shape)
+
+            # Save to file
+            if not self.config.eval:
+                sparse.save_npz(os.path.join(self.checkpoint_dir, f"preds/preds_{idx}.npz"), mat)
+            else:
+                sparse.save_npz(os.path.join(self.checkpoint_dir, f"preds_{idx}.npz"), mat)
 
     def _save_predictions(self, dataloader, predict_out_path):
         """Save top k label results.

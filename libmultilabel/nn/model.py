@@ -1,12 +1,11 @@
 from abc import abstractmethod
 
 import lightning as L
-import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
 
-from ..common_utils import argsort_top_k, dump_log
+from ..common_utils import dump_log
 from ..nn.metrics import get_metrics, tabulate_metrics
 
 
