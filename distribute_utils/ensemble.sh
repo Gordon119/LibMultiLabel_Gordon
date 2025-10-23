@@ -23,7 +23,7 @@ data=$4
 echo "total: $ENSEMBLE_RUNS"
 
 # Hosts list
-HOSTS=("sally" "local" "lucy")
+HOSTS=("sally" "woodstock" "local" "lucy")
 
 run_on_host() {
     host=$1

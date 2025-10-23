@@ -6,7 +6,6 @@ min_vocab_freq: 1
 max_seq_length: 500
 
 # train
-seed: 1337
 epochs: 50
 batch_size: 64
 optimizer: adam
