@@ -1,4 +1,7 @@
 xmlcnn/*
+kim_cnn/*
+test/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
