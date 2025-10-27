@@ -15,6 +15,9 @@ def add_all_arguments(parser):
     parser.add_argument(
         "--result_dir", default="./runs", help="The directory to save checkpoints and logs (default: %(default)s)"
     )
+    parser.add_argument(
+        "--run_name", default=None, help="The name of dir (default: %(default)s)"
+    )
 
     # data
     parser.add_argument(
@@ -281,11 +284,12 @@ def get_config():
         args.scheduler_config = None
     config = AttributeDict(vars(args))
 
-    config.run_name = "{}_{}_{}".format(
-        config.data_name,
-        Path(config.config).stem if config.config else config.model_name,
-        datetime.now().strftime("%Y%m%d%H%M%S"),
-    )
+    if not config.run_name:
+        config.run_name = "{}_{}_{}".format(
+            config.data_name,
+            Path(config.config).stem if config.config else config.model_name,
+            datetime.now().strftime("%Y%m%d%H%M%S"),
+        )
     config.checkpoint_dir = os.path.join(config.result_dir, config.run_name)
     config.log_path = os.path.join(config.checkpoint_dir, "logs.json")
     config.predict_out_path = config.predict_out_path or os.path.join(config.checkpoint_dir, "predictions.txt")

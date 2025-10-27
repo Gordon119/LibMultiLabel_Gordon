@@ -18,7 +18,7 @@ model=$1
 data=$2
 
 # Hosts list
-HOSTS=("local" "sally" "lucy")
+HOSTS=("local" "sally" "lucy" "woodstock")
 
 run_on_host() {
     host=$1

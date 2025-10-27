@@ -2,6 +2,7 @@ import logging
 import os
 import pickle
 from tqdm import tqdm
+import json
 
 import numpy as np
 from scipy import sparse
@@ -82,7 +83,11 @@ class TorchTrainer:
                     self.datasets, self.config.label_file, self.config.include_test_labels
                 )
         if self.config.ensemble and self.sample_rate:
-            self.indices = self.subsample_indices(len(classes), self.sample_rate)
+            if not self.config.eval:
+                self.indices = self.subsample_indices(len(classes), self.sample_rate)
+            else:
+                self.indices = json.load(open(os.path.join(self.result_dir, "logs.json"), "r"))["config"]["indices"]
+            
             self.classes = [classes[i] for i in self.indices]
             classes_set = set(self.classes)
             for split_name in list(self.datasets.keys()):
@@ -340,32 +345,31 @@ class TorchTrainer:
     def test_ensemble(self):
         assert "test" in self.datasets and self.trainer is not None
         logging.info("Ensembled Testing on test set.")
-
         test_loader = self._get_dataset_loader(split="test")
         batch_predictions = self.trainer.predict(self.model, dataloaders=test_loader)
-
+        
+        pred_dir = os.path.join(self.checkpoint_dir, "preds")
         if not self.config.eval:
-            os.makedirs(os.path.join(self.checkpoint_dir, "preds"), exist_ok=True)
-
-        top_k = 10000
+            os.makedirs(pred_dir, exist_ok=True)
+        
         for idx, batch in enumerate(tqdm(batch_predictions)):
             scores = np.array(batch["pred_scores"])
-            # Get top-K indices and values per row
-            K = min(top_k, scores.shape[1])
+            
+            K = scores.shape[1] // 2
+            
             top_idx = np.argpartition(scores, -K, axis=1)[:, -K:]
             top_val = np.take_along_axis(scores, top_idx, axis=1)
+            
+            save_path = os.path.join(pred_dir if not self.config.eval else self.checkpoint_dir, f"preds_{idx}.npz")
+            
+            np.savez_compressed(
+                save_path,
+                indices=top_idx.astype(np.uint32),
+                values=top_val.astype(np.float32),
+                shape=scores.shape
+            )
 
-            # Build sparse matrix
-            rows = np.repeat(np.arange(scores.shape[0]), K)
-            cols = top_idx.reshape(-1)
-            data = top_val.reshape(-1)
-            mat = sparse.csr_matrix((data, (rows, cols)), shape=scores.shape)
-
-            # Save to file
-            if not self.config.eval:
-                sparse.save_npz(os.path.join(self.checkpoint_dir, f"preds/preds_{idx}.npz"), mat)
-            else:
-                sparse.save_npz(os.path.join(self.checkpoint_dir, f"preds_{idx}.npz"), mat)
+        logging.info(f"Saved predictions with top-{K} per sample to {pred_dir}")
 
     def _save_predictions(self, dataloader, predict_out_path):
         """Save top k label results.

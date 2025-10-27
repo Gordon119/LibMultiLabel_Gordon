@@ -93,7 +93,7 @@ def metrics_from_npz_predictions(dataloader, classes, root_dir, max_models=100):
     for batch_idx, batch in enumerate(tqdm(dataloader, desc="Evaluating")):
         bsz = batch["label"].shape[0]
         preds_sum = np.zeros((bsz, len(classes)), dtype=np.float32)
-        preds_cnt = np.zeros(len(classes), dtype=np.int32)
+        preds_cnt = np.zeros((bsz, len(classes)), dtype=np.int32)
 
         for pred_dir, indices in model_info:
             batch_file = os.path.join(pred_dir, f"preds_{batch_idx}.npz")
@@ -114,7 +114,8 @@ def metrics_from_npz_predictions(dataloader, classes, root_dir, max_models=100):
             batch_preds = 1.0 / (1.0 + np.exp(-batch_preds))
             
             preds_sum[:, indices] += batch_preds
-            preds_cnt[indices] += 1
+            non_zero_mask = batch_preds != 0
+            preds_cnt[:, indices] += non_zero_mask
                 
         preds_avg = np.divide(
             preds_sum,
@@ -140,7 +141,7 @@ def parse_args():
     parser.add_argument("--test-path", type=str, default="data/amazon-670k/test.txt")
     parser.add_argument("--output-path", type=str, default="xmlcnn/amazon-670k/ensemble/logs.json")
     parser.add_argument("--batch-size", type=int, default=256)
-    parser.add_argument("--embed-file", type=int, default="glove.6B.300d")
+    parser.add_argument("--embed-file", default="glove.6B.300d")
     parser.add_argument("--max-models", type=int, default=100,
                         help="Maximum number of models to ensemble (default: 100)")
 
