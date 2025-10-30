@@ -6,7 +6,7 @@ import torch
 from tqdm import tqdm
 import numpy as np
 import glob
-from scipy import sparse
+import scipy
 
 import libmultilabel.nn.data_utils as data_utils
 from libmultilabel.nn.metrics import get_metrics, tabulate_metrics
@@ -26,7 +26,7 @@ def prepare_data(data_path, batch_size, embed_file):
     word_dict, _ = data_utils.load_or_build_text_dict(
         dataset=datasets["train"],
         vocab_file=None,
-        min_vocab_freq=500,
+        min_vocab_freq=1,
         embed_file=embed_file,
         silent=True,
         normalize_embed=False,
@@ -79,6 +79,9 @@ def metrics_from_npz_predictions(dataloader, classes, root_dir, max_models=100):
         if len(model_info) >= max_models:
             break
 
+    if len(model_info) == 0:
+        raise ValueError(f"No valid models found in {root_dir}")
+
     print(f"Loaded {len(model_info)} models")
     
     # Check label coverage
@@ -88,6 +91,10 @@ def metrics_from_npz_predictions(dataloader, classes, root_dir, max_models=100):
     
     coverage = len(all_indices) / len(classes) * 100
     print(f"Label coverage: {len(all_indices)}/{len(classes)} ({coverage:.1f}%)")
+    
+    if coverage < 100:
+        uncovered = len(classes) - len(all_indices)
+        print(f"Warning: {uncovered} labels not covered by any model")
     
     # Main evaluation loop
     for batch_idx, batch in enumerate(tqdm(dataloader, desc="Evaluating")):
@@ -102,21 +109,26 @@ def metrics_from_npz_predictions(dataloader, classes, root_dir, max_models=100):
                 print(f"Warning: Missing batch {batch_idx} for model {pred_dir}, skipping")
                 continue
             
-            mat = sparse.load_npz(batch_file)
-            batch_preds = mat.toarray()
+            # Load compressed format (indices and values)
+            data = np.load(batch_file)
+            top_idx = data['indices']  # Shape: (batch_size, K)
+            top_val = data['values']    # Shape: (batch_size, K)
             
-            # Verify shape matches
-            if batch_preds.shape[0] != bsz:
-                raise ValueError(f"Batch size mismatch in {batch_file}: expected {bsz}, got {batch_preds.shape[0]}")
-            if batch_preds.shape[1] != len(indices):
-                raise ValueError(f"Label count mismatch in {batch_file}: expected {len(indices)}, got {batch_preds.shape[1]}")
+            # Verify batch size matches
+            if top_idx.shape[0] != bsz:
+                print(f"Warning: Batch size mismatch in {batch_file}: "
+                        f"expected {bsz}, got {top_idx.shape[0]}")
+                continue
             
-            batch_preds = 1.0 / (1.0 + np.exp(-batch_preds))
+            top_val = scipy.special.expit(top_val)
             
-            preds_sum[:, indices] += batch_preds
-            non_zero_mask = batch_preds != 0
-            preds_cnt[:, indices] += non_zero_mask
-                
+            indices_array = np.array(indices, dtype=np.int32)
+            global_idx = indices_array[top_idx]            
+
+            preds_sum[np.arange(bsz)[:, None], global_idx] += top_val
+            preds_cnt[np.arange(bsz)[:, None], global_idx] += 1
+
+        # Average predictions per sample per label
         preds_avg = np.divide(
             preds_sum,
             preds_cnt,

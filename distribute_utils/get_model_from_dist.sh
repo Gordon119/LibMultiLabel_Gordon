@@ -19,7 +19,7 @@ model=$1
 data=$2
 
 # Hosts to connect to
-HOSTS=("woodstock" "lucy" "sally")
+HOSTS=("woodstock" "lucy" "svm")
 # Remote ensemble directory
 REMOTE_ENSEMBLE_DIR="$REMOTE_BASE_DIR/$model/$data/ensemble"
 
