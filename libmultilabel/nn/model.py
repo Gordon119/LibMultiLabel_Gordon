@@ -5,6 +5,7 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 
+from transformers import get_cosine_schedule_with_warmup
 from ..common_utils import dump_log
 from ..nn.metrics import get_metrics, tabulate_metrics
 
@@ -96,6 +97,21 @@ class MultiLabelModel(L.LightningModule):
                         optimizer, mode="min" if self.val_metric == "Loss" else "max", **dict(self.scheduler_config)
                     ),
                     "monitor": self.val_metric,
+                }
+            elif self.lr_scheduler == "cosine_schedule_with_warmup":
+                warmup_steps = self.scheduler_config.get("warmup_steps", 1000)
+                total_steps = self.trainer.estimated_stepping_batches
+                
+                scheduler = get_cosine_schedule_with_warmup(
+                    optimizer,
+                    num_warmup_steps=warmup_steps,
+                    num_training_steps=total_steps
+                )
+                
+                lr_scheduler_config = {
+                    "scheduler": scheduler,
+                    "interval": "step",
+                    "frequency": 1,
                 }
             else:
                 raise RuntimeError("Unsupported learning rate scheduler: {self.lr_scheduler}")
