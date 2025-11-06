@@ -21,6 +21,11 @@ def add_all_arguments(parser):
 
     # data
     parser.add_argument(
+        "--sparse",
+        action="store_true",
+        help="Store topk prediction or not.",
+    )
+    parser.add_argument(
         "--sample_rate",
         type=float,
         default=None,

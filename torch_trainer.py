@@ -351,25 +351,41 @@ class TorchTrainer:
         pred_dir = os.path.join(self.checkpoint_dir, "preds")
         if not self.config.eval:
             os.makedirs(pred_dir, exist_ok=True)
-        
-        for idx, batch in enumerate(tqdm(batch_predictions)):
-            scores = np.array(batch["pred_scores"])
-            
-            K = scores.shape[1] // 2
-            
-            top_idx = np.argpartition(scores, -K, axis=1)[:, -K:]
-            top_val = np.take_along_axis(scores, top_idx, axis=1)
-            
-            save_path = os.path.join(pred_dir if not self.config.eval else self.checkpoint_dir, f"preds_{idx}.npz")
-            
-            np.savez_compressed(
-                save_path,
-                indices=top_idx.astype(np.uint32),
-                values=top_val.astype(np.float32),
-                shape=scores.shape
-            )
+        if self.config.sparse:
+            for idx, batch in enumerate(tqdm(batch_predictions)):
+                scores = np.array(batch["pred_scores"])
+                
+                K = scores.shape[1] // 2
+                
+                top_idx = np.argpartition(scores, -K, axis=1)[:, -K:]
+                top_val = np.take_along_axis(scores, top_idx, axis=1)
+                
+                save_path = os.path.join(pred_dir if not self.config.eval else self.checkpoint_dir, f"preds_{idx}.npz")
+                
+                np.savez_compressed(
+                    save_path,
+                    indices=top_idx.astype(np.uint32),
+                    values=top_val.astype(np.float32),
+                    shape=scores.shape
+                )
 
-        logging.info(f"Saved predictions with top-{K} per sample to {pred_dir}")
+            logging.info(f"Saved predictions with top-{K} per sample to {pred_dir}")
+        else:
+            for idx, batch in enumerate(tqdm(batch_predictions)):
+                scores = np.array(batch["pred_scores"])
+                
+                save_path = os.path.join(
+                    pred_dir if not self.config.eval else self.checkpoint_dir,
+                    f"preds_{idx}.npz"
+                )
+                
+                np.savez_compressed(
+                    save_path,
+                    values=scores.astype(np.float32),
+                    shape=scores.shape
+                )
+
+            logging.info(f"Saved full predictions to {pred_dir}")
 
     def _save_predictions(self, dataloader, predict_out_path):
         """Save top k label results.
