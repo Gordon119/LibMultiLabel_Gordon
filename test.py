@@ -66,10 +66,12 @@ def metrics_from_npz_predictions(dataloader, classes, root_dir, max_models=100):
             try:
                 with open(log_path, "r") as f:
                     log_data = json.load(f)
-                    if "config" not in log_data or "indices" not in log_data["config"]:
-                        print(f"Skipping {model_dir}, missing indices in logs.json")
+                    if "config" not in log_data:
+                        print(f"Skipping {model_dir}, missing config in logs.json")
                         continue
-                    indices = log_data["config"]["indices"]
+                    
+                    # Get indices if available (sparse format), otherwise None (dense format)
+                    indices = log_data["config"].get("indices", None)
                 
                 model_info.append((pred_path, indices))
             except (json.JSONDecodeError, KeyError) as e:
@@ -87,7 +89,10 @@ def metrics_from_npz_predictions(dataloader, classes, root_dir, max_models=100):
     # Check label coverage
     all_indices = set()
     for _, indices in model_info:
-        all_indices.update(indices)
+        if indices is not None:
+            all_indices.update(indices)
+        else:
+            all_indices.update(range(len(classes)))
     
     coverage = len(all_indices) / len(classes) * 100
     print(f"Label coverage: {len(all_indices)}/{len(classes)} ({coverage:.1f}%)")
@@ -109,24 +114,46 @@ def metrics_from_npz_predictions(dataloader, classes, root_dir, max_models=100):
                 print(f"Warning: Missing batch {batch_idx} for model {pred_dir}, skipping")
                 continue
             
-            # Load compressed format (indices and values)
             data = np.load(batch_file)
-            top_idx = data['indices']  # Shape: (batch_size, K)
-            top_val = data['values']    # Shape: (batch_size, K)
             
-            # Verify batch size matches
-            if top_idx.shape[0] != bsz:
-                print(f"Warning: Batch size mismatch in {batch_file}: "
-                        f"expected {bsz}, got {top_idx.shape[0]}")
-                continue
-            
-            top_val = scipy.special.expit(top_val)
-            
-            indices_array = np.array(indices, dtype=np.int32)
-            global_idx = indices_array[top_idx]            
+            # Check format: sparse (has 'indices') or dense (only 'values')
+            if 'indices' in data:
+                # Sparse format
+                top_idx = data['indices']  # Shape: (batch_size, K)
+                top_val = data['values']    # Shape: (batch_size, K)
+                
+                if top_idx.shape[0] != bsz:
+                    print(f"Warning: Batch size mismatch in {batch_file}: "
+                          f"expected {bsz}, got {top_idx.shape[0]}")
+                    continue
+                
+                top_val = scipy.special.expit(top_val)
+                
+                indices_array = np.array(indices, dtype=np.int32)
+                global_idx = indices_array[top_idx]            
 
-            preds_sum[np.arange(bsz)[:, None], global_idx] += top_val
-            preds_cnt[np.arange(bsz)[:, None], global_idx] += 1
+                preds_sum[np.arange(bsz)[:, None], global_idx] += top_val
+                preds_cnt[np.arange(bsz)[:, None], global_idx] += 1
+            else:
+                # Dense format
+                values = data['values']  # Shape: (batch_size, num_labels)
+                
+                if values.shape[0] != bsz:
+                    print(f"Warning: Batch size mismatch in {batch_file}: "
+                          f"expected {bsz}, got {values.shape[0]}")
+                    continue
+                
+                values = scipy.special.expit(values)
+                
+                if indices is not None:
+                    # Model predicts subset of labels
+                    indices_array = np.array(indices, dtype=np.int32)
+                    preds_sum[:, indices_array] += values
+                    preds_cnt[:, indices_array] += 1
+                else:
+                    # Model predicts all labels
+                    preds_sum += values
+                    preds_cnt += 1
 
         # Average predictions per sample per label
         preds_avg = np.divide(
