@@ -1,0 +1,75 @@
+# =========================
+# Amazon-131K
+# =========================
+
+# data
+training_file: data/Amazon-131K/train.txt
+test_file: data/Amazon-131K/test.txt
+data_name: Amazon-131K
+min_vocab_freq: 1
+max_seq_length: 32
+include_test_labels: false
+remove_no_label_data: true
+add_special_tokens: true
+
+# train
+seed: 1337
+epochs: 100
+batch_size: 64
+optimizer: adamw
+learning_rate_encoder: 0.00001
+learning_rate_classifier: ['grid_search', [0.0001, 0.005, 0.01]]
+momentum: 0
+weight_decay: 0.0001
+patience: 3
+early_stopping_metric: P@1
+shuffle: true
+val_size: 0.1
+
+# scheduler
+lr_scheduler: linear_schedule_with_warmup
+scheduler_config:
+  warmup_steps: 5000
+
+# eval
+eval_batch_size: 64
+monitor_metrics: ['P@1', 'P@3', 'P@5']
+val_metric: P@1
+
+# model
+model_name: DistilBERT
+loss_function: binary_cross_entropy_with_logits
+init_weight: null
+network_config:
+  lm_weight: distilbert/distilbert-base-uncased
+  encoder_dropout: 0.3
+  post_encoder_dropout: 0.3
+
+# pretrained vocab / embeddings
+vocab_file: null
+embed_file: null
+normalize_embed: false
+
+# ensemble
+ensemble: false
+sample_rate: 0
+
+# hyperparameter search
+search_alg: basic_variant
+num_samples: 1
+scheduler: null
+
+# other parameters
+checkpoint_path: null
+cpu: false
+data_workers: 4
+eval: false
+label_file: null
+limit_train_batches: 1.0
+limit_val_batches: 1.0
+limit_test_batches: 1.0
+metric_threshold: 0.5
+result_dir: runs
+save_k_predictions: 0
+silent: true
+embed_cache_dir: null
