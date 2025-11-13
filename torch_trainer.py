@@ -317,6 +317,48 @@ class TorchTrainer:
         # return best model score for ray
         return self.checkpoint_callback.best_model_score.item() if self.checkpoint_callback.best_model_score else None
 
+    def report_model_size(self):
+        groups = {
+            "embedding": [],
+            "encoder": [],
+            "classifier": [],
+        }
+        def sizeof_module(module):
+            """Return size in GB of all parameters in a module."""
+            total_bytes = sum(p.numel() * p.element_size() for p in module.parameters())
+            return total_bytes / (1024 ** 3)  # convert to GB
+
+        # Iterate over top-level submodules
+        for name, submodule in self.model.named_children():
+            size_gb = sizeof_module(submodule)
+            print(f"{name}: {size_gb:.4f} GB")
+            
+        for name, p in self.model.named_parameters():
+            if not p.requires_grad:
+                continue
+            if "embed" in name or "embedding" in name:
+                groups["embedding"].append(p)
+            elif "encoder" in name or "transformer" in name or "lstm" in name or "cnn" in name:
+                groups["encoder"].append(p)
+            else:
+                groups["classifier"].append(p)
+
+        def gb(params):
+            total = sum(p.numel() * p.element_size() for p in params)
+            return total / (1024**3)
+
+        logging.info(f"Embedding GB: {gb(groups['embedding']):.4f}")
+        logging.info(f"Encoder   GB: {gb(groups['encoder']):.4f}")
+        logging.info(f"Classifier GB: {gb(groups['classifier']):.4f}")
+        logging.info(f"Total     GB: {gb(groups['embedding']+groups['encoder']+groups['classifier']):.4f}")
+        logging.info(f"Classifier Percent: {gb(groups['classifier'])/gb(groups['embedding']+groups['encoder']+groups['classifier']):.4f}")
+        log = json.load(open("size.json", "r"))
+        if self.config.data_name in log:
+            log[self.config.data_name][("default" if not self.config.ensemble else "ensemble")] = gb(groups['classifier'])/gb(groups['embedding']+groups['encoder']+groups['classifier'])
+        else:
+            log[self.config.data_name] = {("default" if not self.config.ensemble else "ensemble"): gb(groups['classifier'])/gb(groups['embedding']+groups['encoder']+groups['classifier'])}
+        json.dump(log, open("size.json", "w"))
+
     def test(self, split="test"):
         """Test model with pytorch lightning trainer. Top-k predictions are saved
         if `save_k_predictions` > 0.

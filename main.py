@@ -21,6 +21,11 @@ def add_all_arguments(parser):
 
     # data
     parser.add_argument(
+        "--report_model_size",
+        action="store_true",
+        help="Report parameter size by group"
+    )
+    parser.add_argument(
         "--sparse",
         action="store_true",
         help="Store topk prediction or not.",
@@ -342,6 +347,10 @@ def main():
 
         trainer = TorchTrainer(config)  # initialize trainer
         # train
+        if config.report_model_size:
+            trainer.report_model_size()
+            return
+
         if not config.eval:
             trainer.train()
         # test
