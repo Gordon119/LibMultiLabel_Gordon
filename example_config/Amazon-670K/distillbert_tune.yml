@@ -1,3 +1,7 @@
+# =========================
+# Amazon-670K DeBERTa-v3 Baseline (Lightning)
+# =========================
+
 # data
 training_file: data/Amazon-670K/train.txt
 test_file: data/Amazon-670K/test.txt
@@ -10,18 +14,20 @@ add_special_tokens: true
 
 # train
 seed: 1337
-epochs: 150
+epochs: 100
 batch_size: 64
 optimizer: adamw
-learning_rate: ['grid_search', [0.00006, 0.00008]]
+learning_rate_encoder: 0.00002
+learning_rate_classifier: 0.005
 momentum: 0
-weight_decay: 0.01
-patience: 5
+weight_decay: 0.001
+patience: 3
 early_stopping_metric: P@1
 shuffle: true
+val_size: 0.1
 
 # scheduler
-lr_scheduler: cosine_schedule_with_warmup
+lr_scheduler: linear_schedule_with_warmup
 scheduler_config:
   warmup_steps: 10000
 
@@ -33,9 +39,10 @@ val_metric: P@1
 # model
 model_name: DistilBERT
 loss_function: binary_cross_entropy_with_logits
-init_weight: null
 network_config:
   lm_weight: distilbert/distilbert-base-uncased
+  encoder_dropout: 0.3
+  post_encoder_dropout: 0.3
 
 # pretrained vocab / embeddings
 vocab_file: null
@@ -47,9 +54,9 @@ ensemble: false
 sample_rate: 0
 
 # hyperparameter search
-search_alg: basic_variant
-num_samples: 1
-scheduler: null
+# search_alg: basic_variant
+# num_samples: 1
+# scheduler: null
 
 # other parameters
 checkpoint_path: null
@@ -63,6 +70,5 @@ limit_test_batches: 1.0
 metric_threshold: 0.5
 result_dir: runs
 save_k_predictions: 0
-silent: true
-val_size: 0.1 
+silent: false
 embed_cache_dir: null

@@ -20,6 +20,8 @@ class DistilBERT(nn.Module):
         num_classes,
         lm_weight="distilbert-base-cased",
         lm_window=512,
+        post_encoder_dropout=0,
+        encoder_dropout=0,
         **kwargs,
     ):
         super().__init__()
@@ -29,6 +31,8 @@ class DistilBERT(nn.Module):
             lm_weight,
             num_labels=num_classes,
             torchscript=True,
+            seq_classif_dropout=post_encoder_dropout,
+            dropout=encoder_dropout
         )
 
     def forward(self, input):

@@ -41,6 +41,18 @@ def add_all_arguments(parser):
         action="store_true",
         help="Run ensemble or not.",
     )
+    parser.add_argument(
+        "--learning_rate_encoder",
+        type=float,
+        default=None,
+        help="Separate learning rate for encoder",
+    )
+    parser.add_argument(
+        "--learning_rate_classifier",
+        type=float,
+        default=None,
+        help="Separate learning rate for classifier",
+    )
     parser.add_argument("--data_name", default="unnamed_data", help="Dataset name (default: %(default)s)")
     parser.add_argument("--training_file", help="Path to training data (default: %(default)s)")
     parser.add_argument("--val_file", help="Path to validation data (default: %(default)s)")

@@ -21,9 +21,9 @@ python3 test.py \
     --test-path data/$data/test.txt \
     --output-path $model/$data/ensemble/logs.json
 
-# python3 main.py \
-#     --config example_config/$data/$model.yml \
-#     --training_file data/$data/train.txt \
-#     --test_file data/$data/test.txt \
-#     --data_name $data \
-#     --result_dir $model/$data/base
+python3 main.py \
+    --config example_config/$data/$model.yml \
+    --training_file data/$data/train.txt \
+    --test_file data/$data/test.txt \
+    --data_name $data \
+    --result_dir $model/$data/base

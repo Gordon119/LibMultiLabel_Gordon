@@ -59,7 +59,7 @@ class TorchTrainer:
         self.tokenizer = None
         tokenize_text = "lm_weight" not in config.network_config
         if not tokenize_text:
-            self.tokenizer = AutoTokenizer.from_pretrained(config.network_config["lm_weight"], use_fast=True)
+            self.tokenizer = AutoTokenizer.from_pretrained(config.network_config["lm_weight"], use_fast=False)
         # Load dataset
         if datasets is None:
             self.datasets = data_utils.load_datasets(
@@ -240,6 +240,8 @@ class TorchTrainer:
                 init_weight=self.config.init_weight,
                 log_path=log_path,
                 learning_rate=self.config.learning_rate,
+                learning_rate_encoder=self.config.learning_rate_encoder,
+                learning_rate_classifier=self.config.learning_rate_classifier,
                 optimizer=self.config.optimizer,
                 momentum=self.config.momentum,
                 weight_decay=self.config.weight_decay,
