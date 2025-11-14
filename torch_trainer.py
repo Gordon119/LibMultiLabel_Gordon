@@ -4,6 +4,7 @@ import pickle
 from tqdm import tqdm
 import json
 
+import torch
 import numpy as np
 from scipy import sparse
 from lightning.pytorch.callbacks import ModelCheckpoint
@@ -15,6 +16,7 @@ from libmultilabel.nn.model import Model
 from libmultilabel.nn.nn_utils import init_device, init_model, init_trainer, set_seed
 from libmultilabel.nn.attentionxml import PLTTrainer
 
+# torch.set_float32_matmul_precision('medium')
 
 class TorchTrainer:
     """A wrapper for training neural network models with pytorch lightning trainer.
@@ -59,7 +61,7 @@ class TorchTrainer:
         self.tokenizer = None
         tokenize_text = "lm_weight" not in config.network_config
         if not tokenize_text:
-            self.tokenizer = AutoTokenizer.from_pretrained(config.network_config["lm_weight"], use_fast=False)
+            self.tokenizer = AutoTokenizer.from_pretrained(config.network_config["lm_weight"], use_fast=True)
         # Load dataset
         if datasets is None:
             self.datasets = data_utils.load_datasets(
@@ -157,6 +159,7 @@ class TorchTrainer:
             limit_val_batches=config.limit_val_batches,
             limit_test_batches=config.limit_test_batches,
             save_checkpoints=save_checkpoints,
+            precision=self.config.precision
         )
         callbacks = [callback for callback in self.trainer.callbacks if isinstance(callback, ModelCheckpoint)]
         self.checkpoint_callback = callbacks[0] if callbacks else None

@@ -2,6 +2,7 @@ import torch.nn as nn
 
 from .bert import BERT
 from .distilbert import DistilBERT
+from .deberta import DeBERTa
 from .bert_attention import BERTAttention
 from .caml import CAML
 from .kim_cnn import KimCNN

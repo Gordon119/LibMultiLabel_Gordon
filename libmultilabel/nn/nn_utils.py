@@ -128,6 +128,7 @@ def init_trainer(
     limit_val_batches=1.0,
     limit_test_batches=1.0,
     save_checkpoints=True,
+    precision="32-true"
 ):
     """Initialize a torch lightning trainer.
 
@@ -185,6 +186,7 @@ def init_trainer(
         deterministic="warn",
         gradient_clip_val=0.5,
         gradient_clip_algorithm="value",
+        precision=precision
     )
     return trainer
 

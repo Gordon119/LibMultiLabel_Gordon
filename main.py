@@ -31,6 +31,12 @@ def add_all_arguments(parser):
         help="Store topk prediction or not.",
     )
     parser.add_argument(
+        "--precision",
+        type=str,
+        default="32-true",
+        help="Precision of trainer.",
+    )
+    parser.add_argument(
         "--sample_rate",
         type=float,
         default=None,
