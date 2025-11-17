@@ -7,13 +7,13 @@ max_seq_length: 512
 include_test_labels: true
 remove_no_label_data: true
 add_special_tokens: true
+sparse: true
 
 # train
 # seed: 777
 epochs: 50
 batch_size: 96
 optimizer: adamw
-
 learning_rate: 0
 # learning_rate_encoder: ['grid_search', [5e-5, 7e-5]]
 learning_rate_encoder: 0.00007
