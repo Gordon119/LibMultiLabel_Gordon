@@ -9,7 +9,7 @@ remove_no_label_data: true
 add_special_tokens: true
 
 # train
-seed: 777
+# seed: 777
 epochs: 50
 batch_size: 96
 optimizer: adamw
