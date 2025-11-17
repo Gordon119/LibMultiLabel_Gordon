@@ -1,12 +1,26 @@
 set -e
 
-for data in EUR-Lex Wiki10-31K AmazonCat-13K Amazon-670K
+if [ $# -lt 2 ]; then
+  echo "Usage: $0 <models> <datas>"
+  echo
+  echo "Arguments:"
+  echo "  models         Space-separated list of model names (e.g. 'cnn bert')"
+  echo "  datas          Space-separated list of datasets (e.g. 'amazon eurlex')"
+  exit 1
+fi
+
+model=$1
+datas=$2
+
+for data in $datas
 do
-    if [ "$data" = "Amazon-670K" ]; then
-        python main.py --config example_config/$data/kim_cnn.yml --report_model_size
-        python main.py --config example_config/$data/kim_cnn.yml --report_model_size --ensemble --sample_rate 0.1
-    else
-        python main.py --config example_config/$data/xml_cnn.yml --report_model_size
-        python main.py --config example_config/$data/xml_cnn.yml --report_model_size --ensemble --sample_rate 0.1
-    fi
+    python main.py \
+    --config example_config/$data/$model.yml \
+    --report_model_size
+
+    # python main.py \
+    # --config example_config/$data/$model.yml \
+    # --report_model_size \
+    # --ensemble \
+    # --sample_rate 0.1
 done
