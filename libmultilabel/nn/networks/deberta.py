@@ -2,8 +2,8 @@ import torch.nn as nn
 from transformers import AutoModelForSequenceClassification
 
 
-class DistilBERT(nn.Module):
-    """BERT.
+class DeBERTa(nn.Module):
+    """DeBERTa.
 
     Args:
         num_classes (int): Total number of classes.
@@ -18,21 +18,21 @@ class DistilBERT(nn.Module):
     def __init__(
         self,
         num_classes,
-        lm_weight="distilbert-base-cased",
+        encoder_hidden_dropout=0.1,
+        encoder_attention_dropout=0.1,
+        lm_weight="microsoft/deberta-v3-base",
         lm_window=512,
-        post_encoder_dropout=0,
-        encoder_dropout=0,
         **kwargs,
     ):
         super().__init__()
         self.lm_window = lm_window
-
+        
         self.lm = AutoModelForSequenceClassification.from_pretrained(
             lm_weight,
             num_labels=num_classes,
+            hidden_dropout_prob=encoder_hidden_dropout,
+            attention_probs_dropout_prob=encoder_attention_dropout,
             torchscript=True,
-            seq_classif_dropout=post_encoder_dropout,
-            dropout=encoder_dropout
         )
 
     def forward(self, input):

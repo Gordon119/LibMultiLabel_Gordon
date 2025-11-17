@@ -31,6 +31,12 @@ def add_all_arguments(parser):
         help="Store topk prediction or not.",
     )
     parser.add_argument(
+        "--precision",
+        type=str,
+        default="32-true",
+        help="Precision of trainer.",
+    )
+    parser.add_argument(
         "--sample_rate",
         type=float,
         default=None,
@@ -40,6 +46,18 @@ def add_all_arguments(parser):
         "--ensemble",
         action="store_true",
         help="Run ensemble or not.",
+    )
+    parser.add_argument(
+        "--learning_rate_encoder",
+        type=float,
+        default=None,
+        help="Separate learning rate for encoder",
+    )
+    parser.add_argument(
+        "--learning_rate_classifier",
+        type=float,
+        default=None,
+        help="Separate learning rate for classifier",
     )
     parser.add_argument("--data_name", default="unnamed_data", help="Dataset name (default: %(default)s)")
     parser.add_argument("--training_file", help="Path to training data (default: %(default)s)")
