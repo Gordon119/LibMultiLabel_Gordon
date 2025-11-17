@@ -41,6 +41,8 @@ def init_model(
     init_weight=None,
     log_path=None,
     learning_rate=0.0001,
+    learning_rate_encoder=None,
+    learning_rate_classifier=None,
     optimizer="adam",
     momentum=0.9,
     weight_decay=0,
@@ -85,10 +87,7 @@ def init_model(
         Model: A class that implements `MultiLabelModel` for initializing and training a neural network.
     """
 
-    try:
-        network = getattr(networks, model_name)(embed_vecs=embed_vecs, num_classes=len(classes), **dict(network_config))
-    except:
-        raise AttributeError(f"Failed to initialize {model_name}.")
+    network = getattr(networks, model_name)(embed_vecs=embed_vecs, num_classes=len(classes), **dict(network_config))
 
     if init_weight is not None:
         init_weight = networks.get_init_weight_func(init_weight=init_weight)
@@ -99,6 +98,8 @@ def init_model(
         network=network,
         log_path=log_path,
         learning_rate=learning_rate,
+        learning_rate_encoder=learning_rate_encoder,
+        learning_rate_classifier=learning_rate_classifier,
         optimizer=optimizer,
         momentum=momentum,
         weight_decay=weight_decay,
@@ -127,6 +128,7 @@ def init_trainer(
     limit_val_batches=1.0,
     limit_test_batches=1.0,
     save_checkpoints=True,
+    precision="32-true"
 ):
     """Initialize a torch lightning trainer.
 
@@ -184,6 +186,7 @@ def init_trainer(
         deterministic="warn",
         gradient_clip_val=0.5,
         gradient_clip_algorithm="value",
+        precision=precision
     )
     return trainer
 

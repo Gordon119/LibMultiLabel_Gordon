@@ -3,7 +3,7 @@ training_file: data/Wiki-500K/train.txt
 test_file: data/Wiki-500K/test.txt
 data_name: Wiki-500K
 min_vocab_freq: 1
-max_seq_length: 256
+max_seq_length: 500
 
 # train
 epochs: 50

@@ -15,8 +15,50 @@ def add_all_arguments(parser):
     parser.add_argument(
         "--result_dir", default="./runs", help="The directory to save checkpoints and logs (default: %(default)s)"
     )
+    parser.add_argument(
+        "--run_name", default=None, help="The name of dir (default: %(default)s)"
+    )
 
     # data
+    parser.add_argument(
+        "--report_model_size",
+        action="store_true",
+        help="Report parameter size by group"
+    )
+    parser.add_argument(
+        "--sparse",
+        action="store_true",
+        help="Store topk prediction or not.",
+    )
+    parser.add_argument(
+        "--precision",
+        type=str,
+        default="32-true",
+        help="Precision of trainer.",
+    )
+    parser.add_argument(
+        "--sample_rate",
+        type=float,
+        default=None,
+        help="Sample Rate.",
+    )
+    parser.add_argument(
+        "--ensemble",
+        action="store_true",
+        help="Run ensemble or not.",
+    )
+    parser.add_argument(
+        "--learning_rate_encoder",
+        type=float,
+        default=None,
+        help="Separate learning rate for encoder",
+    )
+    parser.add_argument(
+        "--learning_rate_classifier",
+        type=float,
+        default=None,
+        help="Separate learning rate for classifier",
+    )
     parser.add_argument("--data_name", default="unnamed_data", help="Dataset name (default: %(default)s)")
     parser.add_argument("--training_file", help="Path to training data (default: %(default)s)")
     parser.add_argument("--val_file", help="Path to validation data (default: %(default)s)")
@@ -270,11 +312,12 @@ def get_config():
         args.scheduler_config = None
     config = AttributeDict(vars(args))
 
-    config.run_name = "{}_{}_{}".format(
-        config.data_name,
-        Path(config.config).stem if config.config else config.model_name,
-        datetime.now().strftime("%Y%m%d%H%M%S"),
-    )
+    if not config.run_name:
+        config.run_name = "{}_{}_{}".format(
+            config.data_name,
+            Path(config.config).stem if config.config else config.model_name,
+            datetime.now().strftime("%Y%m%d%H%M%S"),
+        )
     config.checkpoint_dir = os.path.join(config.result_dir, config.run_name)
     config.log_path = os.path.join(config.checkpoint_dir, "logs.json")
     config.predict_out_path = config.predict_out_path or os.path.join(config.checkpoint_dir, "predictions.txt")
@@ -322,10 +365,16 @@ def main():
 
         trainer = TorchTrainer(config)  # initialize trainer
         # train
+        if config.report_model_size:
+            trainer.report_model_size()
+            return
+
         if not config.eval:
             trainer.train()
         # test
-        if "test" in trainer.datasets:
+        if config.ensemble:
+            trainer.test_ensemble()
+        elif "test" in trainer.datasets:
             trainer.test()
 
     collected_logs = collect_handler.get_logs()

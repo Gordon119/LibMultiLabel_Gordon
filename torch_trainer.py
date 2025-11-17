@@ -1,8 +1,12 @@
 import logging
 import os
 import pickle
+from tqdm import tqdm
+import json
 
+import torch
 import numpy as np
+from scipy import sparse
 from lightning.pytorch.callbacks import ModelCheckpoint
 from transformers import AutoTokenizer
 
@@ -12,6 +16,7 @@ from libmultilabel.nn.model import Model
 from libmultilabel.nn.nn_utils import init_device, init_model, init_trainer, set_seed
 from libmultilabel.nn.attentionxml import PLTTrainer
 
+# torch.set_float32_matmul_precision('medium')
 
 class TorchTrainer:
     """A wrapper for training neural network models with pytorch lightning trainer.
@@ -73,6 +78,33 @@ class TorchTrainer:
 
         self.config.multiclass = is_multiclass_dataset(self.datasets["train"] + self.datasets.get("val", list()))
 
+        # Ensemble
+        self.sample_rate = config.sample_rate
+        logging.info(f"Sample Rate: {self.sample_rate}")
+        classes = data_utils.load_or_build_label(
+                    self.datasets, self.config.label_file, self.config.include_test_labels
+                )
+        if self.config.ensemble and self.sample_rate:
+            if not self.config.eval:
+                self.indices = self.subsample_indices(len(classes), self.sample_rate)
+            else:
+                self.indices = json.load(open(os.path.join(self.result_dir, "logs.json"), "r"))["config"]["indices"]
+            
+            self.classes = [classes[i] for i in self.indices]
+            classes_set = set(self.classes)
+            for split_name in list(self.datasets.keys()):
+                if split_name == "test":
+                    continue
+                filtered_data = []                
+                for sample in self.datasets[split_name]:
+                    filtered_labels = [label for label in sample["label"] if label in classes_set]
+                    new_sample = sample.copy()
+                    if filtered_labels == []:
+                        continue
+                    new_sample["label"] = filtered_labels
+                    filtered_data.append(new_sample)
+                self.datasets[split_name] = filtered_data
+
         if self.config.model_name.lower() == "attentionxml":
             # Note that AttentionXML produces two models. checkpoint_path directs to model_1
             if config.checkpoint_path is None:
@@ -127,9 +159,21 @@ class TorchTrainer:
             limit_val_batches=config.limit_val_batches,
             limit_test_batches=config.limit_test_batches,
             save_checkpoints=save_checkpoints,
+            precision=self.config.precision
         )
         callbacks = [callback for callback in self.trainer.callbacks if isinstance(callback, ModelCheckpoint)]
         self.checkpoint_callback = callbacks[0] if callbacks else None
+
+    def subsample_indices(self, n_labels, sample_rate):
+        n_select = int(n_labels * sample_rate)
+        
+        if n_select == 0:
+            raise ValueError(f"Sample rate {sample_rate} results in 0 labels selected")
+        if n_select > n_labels:
+            n_select = n_labels
+            
+        indices = np.random.choice(n_labels, n_select, replace=False)
+        return np.sort(indices).tolist()
 
     def _setup_model(
         self,
@@ -199,6 +243,8 @@ class TorchTrainer:
                 init_weight=self.config.init_weight,
                 log_path=log_path,
                 learning_rate=self.config.learning_rate,
+                learning_rate_encoder=self.config.learning_rate_encoder,
+                learning_rate_classifier=self.config.learning_rate_classifier,
                 optimizer=self.config.optimizer,
                 momentum=self.config.momentum,
                 weight_decay=self.config.weight_decay,
@@ -268,11 +314,72 @@ class TorchTrainer:
                 "No model is saved during training. \
                 If you want to save the best and the last model, please set `save_checkpoints` to True."
             )
-
+        if self.config.ensemble and self.sample_rate:
+            self.config.indices = self.indices
+            print(f"Kept indices:{self.config.indices}")
         dump_log(self.log_path, config=self.config)
 
         # return best model score for ray
         return self.checkpoint_callback.best_model_score.item() if self.checkpoint_callback.best_model_score else None
+
+    def report_model_size(self):
+        groups = {
+            "embedding": [],
+            "encoder": [],
+            "classifier": [],
+        }
+
+        def sizeof_module(module):
+            total_bytes = sum(p.numel() * p.element_size() for p in module.parameters())
+            return total_bytes / (1024 ** 3)
+
+        # Opt{ional: print top-level module sizes
+        for name, submodule in self.model.named_children():
+            size_gb = sizeof_module(submodule)
+            print(f"{name}: {size_gb:.4f} GB")
+
+        for name, p in self.model.named_parameters():
+            if not p.requires_grad:
+                continue
+            if "embed" in name or "embedding" in name:
+                groups["embedding"].append(p)
+            elif any(k in name for k in ["encoder", "transformer", "lstm", "cnn"]):
+                groups["encoder"].append(p)
+            else:
+                groups["classifier"].append(p)
+
+        def gb(params):
+            total = sum(p.numel() * p.element_size() for p in params)
+            return total / (1024**3)
+
+        # Compute sizes
+        embedding_gb  = gb(groups["embedding"])
+        encoder_gb    = gb(groups["encoder"])
+        classifier_gb = gb(groups["classifier"])
+        total_gb      = embedding_gb + encoder_gb + classifier_gb
+
+        classifier_prop = classifier_gb / total_gb if total_gb > 0 else 0.0
+
+        # JSON filename
+        model_name = getattr(self.config, "model_name", "model")
+        json_path = f"{model_name}_size.json"
+
+        # Build fresh JSON structure
+        log = {
+            self.config.data_name: {
+                "ensemble" if self.config.ensemble else "default": {
+                    "embedding_gb": embedding_gb,
+                    "encoder_gb": encoder_gb,
+                    "classifier_gb": classifier_gb,
+                    "total_gb": total_gb,
+                    "classifier_proportion": classifier_prop,
+                }
+            }
+        }
+
+        # Always overwrite file
+        with open(json_path, "w") as f:
+            json.dump(log, f, indent=2)
 
     def test(self, split="test"):
         """Test model with pytorch lightning trainer. Top-k predictions are saved
@@ -298,6 +405,51 @@ class TorchTrainer:
 
         dump_log(self.log_path, config=self.config)
         return metric_dict
+
+    def test_ensemble(self):
+        assert "test" in self.datasets and self.trainer is not None
+        logging.info("Ensembled Testing on test set.")
+        test_loader = self._get_dataset_loader(split="test")
+        batch_predictions = self.trainer.predict(self.model, dataloaders=test_loader)
+        
+        pred_dir = os.path.join(self.checkpoint_dir, "preds")
+        if not self.config.eval:
+            os.makedirs(pred_dir, exist_ok=True)
+        if self.config.sparse:
+            for idx, batch in enumerate(tqdm(batch_predictions)):
+                scores = np.array(batch["pred_scores"])
+                
+                K = scores.shape[1] // 2
+                
+                top_idx = np.argpartition(scores, -K, axis=1)[:, -K:]
+                top_val = np.take_along_axis(scores, top_idx, axis=1)
+                
+                save_path = os.path.join(pred_dir if not self.config.eval else self.checkpoint_dir, f"preds_{idx}.npz")
+                
+                np.savez_compressed(
+                    save_path,
+                    indices=top_idx.astype(np.uint32),
+                    values=top_val.astype(np.float32),
+                    shape=scores.shape
+                )
+
+            logging.info(f"Saved predictions with top-{K} per sample to {pred_dir}")
+        else:
+            for idx, batch in enumerate(tqdm(batch_predictions)):
+                scores = np.array(batch["pred_scores"])
+                
+                save_path = os.path.join(
+                    pred_dir if not self.config.eval else self.checkpoint_dir,
+                    f"preds_{idx}.npz"
+                )
+                
+                np.savez_compressed(
+                    save_path,
+                    values=scores.astype(np.float32),
+                    shape=scores.shape
+                )
+
+            logging.info(f"Saved full predictions to {pred_dir}")
 
     def _save_predictions(self, dataloader, predict_out_path):
         """Save top k label results.

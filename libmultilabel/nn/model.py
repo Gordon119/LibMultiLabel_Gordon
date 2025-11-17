@@ -1,12 +1,12 @@
 from abc import abstractmethod
 
 import lightning as L
-import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
 
-from ..common_utils import argsort_top_k, dump_log
+from transformers import get_cosine_schedule_with_warmup, get_linear_schedule_with_warmup
+from ..common_utils import dump_log
 from ..nn.metrics import get_metrics, tabulate_metrics
 
 
@@ -31,6 +31,8 @@ class MultiLabelModel(L.LightningModule):
         self,
         num_classes,
         learning_rate=0.0001,
+        learning_rate_encoder=None,
+        learning_rate_classifier=None,
         optimizer="adam",
         momentum=0.9,
         weight_decay=0,
@@ -49,6 +51,8 @@ class MultiLabelModel(L.LightningModule):
 
         # optimizer
         self.learning_rate = learning_rate
+        self.learning_rate_encoder = learning_rate_encoder
+        self.learning_rate_classifier = learning_rate_classifier
         self.optimizer = optimizer
         self.momentum = momentum
         self.weight_decay = weight_decay
@@ -75,7 +79,23 @@ class MultiLabelModel(L.LightningModule):
 
     def configure_optimizers(self):
         """Initialize an optimizer for the free parameters of the network."""
-        parameters = [p for p in self.parameters() if p.requires_grad]
+        if self.learning_rate_classifier and self.learning_rate_encoder:
+            # Separate parameter groups
+            encoder_params = []
+            classifier_params = []
+            for name, param in self.named_parameters():
+                if not param.requires_grad:
+                    continue
+                if "encoder" in name or "distilbert" in name or "transformer" in name:
+                    encoder_params.append(param)
+                else:
+                    classifier_params.append(param)
+            parameters = [
+                {"params": encoder_params, "lr": self.learning_rate_encoder},
+                {"params": classifier_params, "lr": self.learning_rate_classifier},
+            ]
+        else:
+            parameters = [p for p in self.parameters() if p.requires_grad]
         optimizer_name = self.optimizer
         if optimizer_name == "sgd":
             optimizer = optim.SGD(
@@ -90,6 +110,12 @@ class MultiLabelModel(L.LightningModule):
         else:
             raise RuntimeError("Unsupported optimizer: {self.optimizer}")
 
+        total_steps = self.trainer.estimated_stepping_batches
+        warmup_ratio = self.scheduler_config.get("warmup_ratio", None)
+        warmup_steps = self.scheduler_config.get("warmup_steps", None)
+        if warmup_ratio is not None:
+            warmup_steps = int(total_steps * warmup_ratio)
+
         if self.lr_scheduler:
             if self.lr_scheduler == "ReduceLROnPlateau":
                 lr_scheduler_config = {
@@ -97,6 +123,28 @@ class MultiLabelModel(L.LightningModule):
                         optimizer, mode="min" if self.val_metric == "Loss" else "max", **dict(self.scheduler_config)
                     ),
                     "monitor": self.val_metric,
+                }
+            elif self.lr_scheduler == "linear_schedule_with_warmup":
+                scheduler = get_linear_schedule_with_warmup(
+                    optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps
+                )
+
+                lr_scheduler_config = {
+                    "scheduler": scheduler,
+                    "interval": "step",
+                    "frequency": 1,
+                }
+            elif self.lr_scheduler == "cosine_schedule_with_warmup":                
+                scheduler = get_cosine_schedule_with_warmup(
+                    optimizer,
+                    num_warmup_steps=warmup_steps,
+                    num_training_steps=total_steps
+                )
+                
+                lr_scheduler_config = {
+                    "scheduler": scheduler,
+                    "interval": "step",
+                    "frequency": 1,
                 }
             else:
                 raise RuntimeError("Unsupported learning rate scheduler: {self.lr_scheduler}")
@@ -157,11 +205,12 @@ class MultiLabelModel(L.LightningModule):
         """
         pred_logits = self(batch)
         pred_scores = pred_logits.detach().cpu().numpy()
-        k = self.save_k_predictions
-        top_k_idx = argsort_top_k(pred_scores, k, axis=1)
-        top_k_scores = np.take_along_axis(pred_scores, top_k_idx, axis=1)
+        # k = self.save_k_predictions
+        # top_k_idx = argsort_top_k(pred_scores, k, axis=1)
+        # top_k_scores = np.take_along_axis(pred_scores, top_k_idx, axis=1)
 
-        return {"top_k_pred": top_k_idx, "top_k_pred_scores": top_k_scores}
+        # return {"top_k_pred": top_k_idx, "top_k_pred_scores": top_k_scores}
+        return {"pred_scores": pred_scores}
 
     def forward(self, batch):
         """Compute predicted logits."""
