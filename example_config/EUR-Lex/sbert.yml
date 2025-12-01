@@ -1,13 +1,13 @@
 # data
-training_file: data/Amazon-670K/train.txt
-test_file: data/Amazon-670K/test.txt
-data_name: Amazon-670K
+training_file: data/EUR-Lex/train.txt
+test_file: data/EUR-Lex/test.txt
+data_name: EUR-Lex
 min_vocab_freq: 1
 max_seq_length: 512
 include_test_labels: true
 remove_no_label_data: true
 add_special_tokens: true
-sparse: true
+sparse: false
 
 # train
 # seed: 777
@@ -53,10 +53,6 @@ network_config:
 vocab_file: null
 embed_file: null
 normalize_embed: false
-
-# ensemble
-ensemble: false
-sample_rate: 0
 
 # hyperparameter search
 search_alg: basic_variant
