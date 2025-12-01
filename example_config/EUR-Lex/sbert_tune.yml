@@ -1,7 +1,7 @@
 # data
-training_file: data/Amazon-670K/train.txt
-test_file: data/Amazon-670K/test.txt
-data_name: Amazon-670K
+training_file: data/EUR-Lex/train.txt
+test_file: data/EUR-Lex/test.txt
+data_name: EUR-Lex
 min_vocab_freq: 1
 max_seq_length: 512
 include_test_labels: true
@@ -10,13 +10,13 @@ add_special_tokens: true
 sparse: false
 
 # train
-# seed: 777
+seed: 777
 epochs: 50
 batch_size: 128
 optimizer: adamw
 learning_rate: 0
-learning_rate_encoder: ['grid_search', [5e-5, 7e-5]]
-learning_rate_classifier: ['grid_search', [0.005, 0.01]]
+learning_rate_encoder: ['grid_search', [0.00001, 0.00003]]
+learning_rate_classifier: ['grid_search', [0.0001, 0.0003]]
 
 momentum: 0
 weight_decay: 0.001
@@ -73,5 +73,5 @@ limit_test_batches: 1.0
 metric_threshold: 0.5
 result_dir: runs
 save_k_predictions: 0
-silent: false
+silent: true
 embed_cache_dir: null

@@ -1,6 +1,7 @@
 xml_cnn/*
 kim_cnn/*
 test/
+sbert/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
