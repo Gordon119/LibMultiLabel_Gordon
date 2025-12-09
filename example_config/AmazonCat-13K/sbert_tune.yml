@@ -15,11 +15,11 @@ epochs: 50
 batch_size: 128
 optimizer: adamw
 learning_rate: 0
-learning_rate_encoder: ['grid_search', [0.00001, 0.00002]]
-learning_rate_classifier: ['grid_search', [0.001, 0.002, 0.004, 0.005, 0.006, 0.007, 0.008, 0.01]]
+learning_rate_encoder: ['grid_search', [0.00005, 0.00007]]
+learning_rate_classifier: ['grid_search', [0.005, 0.01]]
 
 momentum: 0
-weight_decay: 0.01
+weight_decay: 0.001
 patience: 5
 early_stopping_metric: P@1
 shuffle: true
@@ -29,7 +29,7 @@ precision: 32
 # scheduler - COSINE WITH WARMUP
 lr_scheduler: cosine_schedule_with_warmup
 scheduler_config:
-  warmup_steps: 2000
+  warmup_steps: 3000
 
 # eval
 eval_batch_size: 256
