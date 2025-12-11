@@ -12,6 +12,7 @@ class SBERT(nn.Module):
     def __init__(
         self,
         num_classes,
+        dropout=0.0,
         encoder_hidden_dropout=0.1,
         encoder_attention_dropout=0.1,
         post_encoder_dropout=0.1,
@@ -21,6 +22,11 @@ class SBERT(nn.Module):
     ):
         super().__init__()
         self.lm_window = lm_window
+
+        if dropout != 0:
+            hidden_dropout_prob = dropout
+            attention_probs_dropout_prob = dropout
+            post_encoder_dropout = dropout
 
         # Load backbone WITHOUT classification head
         self.lm = AutoModel.from_pretrained(

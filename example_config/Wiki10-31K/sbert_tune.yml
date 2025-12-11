@@ -12,26 +12,27 @@ sparse: false
 # train
 seed: 777
 epochs: 50
-batch_size: 128
+batch_size: 64
 optimizer: adamw
 learning_rate: 0
-learning_rate_encoder: ['grid_search', [0.00001, 0.00002]]
-learning_rate_classifier: ['grid_search', [0.001, 0.002, 0.004, 0.005, 0.006, 0.007, 0.008, 0.01]]
-
+learning_rate_encoder: ['grid_search', [0.00001, 0.00002, 0.00003, 0.00005, 0.00007, 0.0001]]
+learning_rate_classifier: ['grid_search', [0.005, 0.006, 0.007, 0.008, 0.01, 0.05]]
 
 momentum: 0
-weight_decay: 0.001
+weight_decay: ['grid_search', [0, 0.01]]
 patience: 5
 early_stopping_metric: P@1
 shuffle: true
-val_size: 0.1
+val_size: 0.05
 precision: 32
 
 # scheduler - COSINE WITH WARMUP
-lr_scheduler: cosine_schedule_with_warmup
+# lr_scheduler: cosine_schedule_with_warmup
+# scheduler_config:
+#   warmup_step: 0.6
+lr_scheduler: null
 scheduler_config:
-  warmup_steps: 100
-
+  warmup_ratio: 0
 
 # eval
 eval_batch_size: 256
@@ -44,9 +45,7 @@ loss_function: binary_cross_entropy_with_logits
 init_weight: null
 network_config:
   lm_weight: sentence-transformers/all-MiniLM-L12-v2
-  hidden_dropout_prob: 0.2
-  attention_probs_dropout_prob: 0.1
-  post_encoder_dropout: 0.3
+  dropout: ['grid_search', [0, 0.1]]
   lm_window: 512
 
 # pretrained vocab / embeddings
