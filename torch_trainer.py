@@ -17,7 +17,6 @@ from libmultilabel.nn.model import Model
 from libmultilabel.nn.nn_utils import init_device, init_model, init_trainer, set_seed
 from libmultilabel.nn.attentionxml import PLTTrainer
 
-# torch.set_float32_matmul_precision('medium')
 
 class TorchTrainer:
     """A wrapper for training neural network models with pytorch lightning trainer.
@@ -148,7 +147,7 @@ class TorchTrainer:
             return
 
         wandb_logger = False
-        if config.enable_logging:
+        if config.get("enable_logging", False):
             wandb_logger = WandbLogger(project=config.wandb_project, name=config.run_name)
         
         self._setup_model(log_path=self.log_path, checkpoint_path=config.checkpoint_path)
@@ -164,7 +163,7 @@ class TorchTrainer:
             limit_val_batches=config.limit_val_batches,
             limit_test_batches=config.limit_test_batches,
             save_checkpoints=save_checkpoints,
-            precision=self.config.precision,
+            precision=config.get("precision", "32"),
             logger=wandb_logger
         )
         callbacks = [callback for callback in self.trainer.callbacks if isinstance(callback, ModelCheckpoint)]
@@ -249,8 +248,8 @@ class TorchTrainer:
                 init_weight=self.config.init_weight,
                 log_path=log_path,
                 learning_rate=self.config.learning_rate,
-                learning_rate_encoder=self.config.learning_rate_encoder,
-                learning_rate_classifier=self.config.learning_rate_classifier,
+                learning_rate_encoder=self.config.get("learning_rate_encoder", None),
+                learning_rate_classifier=self.config.get("learning_rate_classifier", None),
                 optimizer=self.config.optimizer,
                 momentum=self.config.momentum,
                 weight_decay=self.config.weight_decay,
@@ -349,7 +348,7 @@ class TorchTrainer:
                 continue
             if "embed" in name or "embedding" in name:
                 groups["embedding"].append(p)
-            elif any(k in name for k in ["encoder", "transformer", "lstm", "cnn"]):
+            elif any(k in name for k in ["lm", "encoder", "transformer", "lstm", "cnn"]):
                 groups["encoder"].append(p)
             else:
                 groups["classifier"].append(p)

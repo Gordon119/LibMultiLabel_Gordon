@@ -1,7 +1,7 @@
 # data
-training_file: data/WikiSeeAlso-320K/train.txt
-test_file: data/WikiSeeAlso-320K/test.txt
-data_name: WikiSeeAlso-320K
+training_file: data/Amazon-131K/train.txt
+test_file: data/Amazon-131K/test.txt
+data_name: Amazon-131K
 min_vocab_freq: 1
 max_seq_length: 500
 include_test_labels: false

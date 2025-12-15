@@ -111,10 +111,11 @@ class MultiLabelModel(L.LightningModule):
             raise RuntimeError("Unsupported optimizer: {self.optimizer}")
 
         total_steps = self.trainer.estimated_stepping_batches
-        warmup_ratio = self.scheduler_config.get("warmup_ratio", None)
-        warmup_steps = self.scheduler_config.get("warmup_steps", None)
-        if warmup_ratio is not None:
-            warmup_steps = int(total_steps * warmup_ratio)
+        if self.scheduler_config:
+            warmup_ratio = self.scheduler_config.get("warmup_ratio", None)
+            warmup_steps = self.scheduler_config.get("warmup_steps", None)
+            if warmup_ratio is not None:
+                warmup_steps = int(total_steps * warmup_ratio)
 
         if self.lr_scheduler:
             if self.lr_scheduler == "ReduceLROnPlateau":
