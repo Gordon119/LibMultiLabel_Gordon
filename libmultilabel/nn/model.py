@@ -152,6 +152,16 @@ class MultiLabelModel(L.LightningModule):
 
     def training_step(self, batch, batch_idx):
         loss, _ = self.shared_step(batch)
+        
+        # record train loss vs epoch
+        self.log(
+            "train/loss",
+            loss,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            sync_dist=True,
+        )
         return loss
 
     def validation_step(self, batch, batch_idx):

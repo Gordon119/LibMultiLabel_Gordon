@@ -128,7 +128,8 @@ def init_trainer(
     limit_val_batches=1.0,
     limit_test_batches=1.0,
     save_checkpoints=True,
-    precision="32-true"
+    precision="32-true",
+    logger=False
 ):
     """Initialize a torch lightning trainer.
 
@@ -173,7 +174,7 @@ def init_trainer(
             )
         ]
     trainer = L.Trainer(
-        logger=False,
+        logger=logger,
         num_sanity_val_steps=0,
         accelerator="cpu" if use_cpu else "gpu",
         devices="auto" if use_cpu else 1,

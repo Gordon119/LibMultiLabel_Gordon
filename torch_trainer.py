@@ -8,6 +8,7 @@ import torch
 import numpy as np
 from scipy import sparse
 from lightning.pytorch.callbacks import ModelCheckpoint
+from lightning.pytorch.loggers import WandbLogger
 from transformers import AutoTokenizer
 
 from libmultilabel.common_utils import dump_log, is_multiclass_dataset
@@ -146,6 +147,10 @@ class TorchTrainer:
             )
             return
 
+        wandb_logger = False
+        if config.enable_logging:
+            wandb_logger = WandbLogger(project=config.wandb_project, name=config.run_name)
+        
         self._setup_model(log_path=self.log_path, checkpoint_path=config.checkpoint_path)
         self.trainer = init_trainer(
             checkpoint_dir=self.checkpoint_dir,
@@ -159,7 +164,8 @@ class TorchTrainer:
             limit_val_batches=config.limit_val_batches,
             limit_test_batches=config.limit_test_batches,
             save_checkpoints=save_checkpoints,
-            precision=self.config.precision
+            precision=self.config.precision,
+            logger=wandb_logger
         )
         callbacks = [callback for callback in self.trainer.callbacks if isinstance(callback, ModelCheckpoint)]
         self.checkpoint_callback = callbacks[0] if callbacks else None
