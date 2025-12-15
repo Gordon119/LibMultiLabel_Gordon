@@ -3,7 +3,7 @@ training_file: data/Amazon-131K/train.txt
 test_file: data/Amazon-131K/test.txt
 data_name: Amazon-131K
 min_vocab_freq: 1
-max_seq_length: 500
+max_seq_length: 128
 include_test_labels: false
 remove_no_label_data: false
 add_special_tokens: false
@@ -35,7 +35,7 @@ init_weight: kaiming_uniform
 network_config:
   embed_dropout: ['choice', [0.2, 0.4, 0.6, 0.8]]
   post_encoder_dropout: ['choice', [0.2, 0.4, 0.6, 0.8]]
-  filter_sizes: [8]
+  filter_sizes: [4]
   hidden_dim: ['choice', [256, 512, 1024]]
   num_filter_per_size: ['choice', [96, 192, 384, 768]]
   num_pool: ['choice', [2, 8]]

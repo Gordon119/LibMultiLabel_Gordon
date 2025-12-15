@@ -3,7 +3,7 @@ training_file: data/WikiSeeAlso-320K/train.txt
 test_file: data/WikiSeeAlso-320K/test.txt
 data_name: WikiSeeAlso-320K
 min_vocab_freq: 1
-max_seq_length: 500
+max_seq_length: 128
 include_test_labels: false
 remove_no_label_data: false
 add_special_tokens: false
