@@ -15,8 +15,8 @@ epochs: 50
 batch_size: 128
 optimizer: adamw
 learning_rate: 0
-learning_rate_encoder: ['grid_search', [0.00007]]
-learning_rate_classifier: ['grid_search', [0.006, 0.007, 0.008, 0.02, 0.03]]
+learning_rate_encoder: 0.00007
+# learning_rate_classifier: ['grid_search', [0.006, 0.007, 0.008, 0.02, 0.03]]
 
 momentum: 0
 weight_decay: 0.001
@@ -73,5 +73,5 @@ limit_test_batches: 1.0
 metric_threshold: 0.5
 result_dir: runs
 save_k_predictions: 0
-silent: true
+silent: false
 embed_cache_dir: null
