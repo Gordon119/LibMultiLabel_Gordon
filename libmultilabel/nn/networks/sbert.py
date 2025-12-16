@@ -17,11 +17,9 @@ class SBERT(nn.Module):
         encoder_attention_dropout=0.1,
         post_encoder_dropout=0.1,
         lm_weight="sentence-transformers/all-MiniLM-L6-v2",
-        lm_window=512,
         **kwargs,
     ):
         super().__init__()
-        self.lm_window = lm_window
 
         if dropout != 0:
             hidden_dropout_prob = dropout

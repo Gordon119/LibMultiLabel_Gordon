@@ -1,7 +1,7 @@
 # data
-training_file: data/Amazon-131K/train.txt
-test_file: data/Amazon-131K/test.txt
-data_name: Amazon-131K
+training_file: data/Amazon-670K/train.txt
+test_file: data/Amazon-670K/test.txt
+data_name: Amazon-670K
 min_vocab_freq: 1
 max_seq_length: 128
 include_test_labels: true

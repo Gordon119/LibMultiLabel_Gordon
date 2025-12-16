@@ -1,7 +1,7 @@
 # data
-training_file: data/Amazon-131K/train.txt
-test_file: data/Amazon-131K/test.txt
-data_name: Amazon-131K
+training_file: data/EUR-Lex/train.txt
+test_file: data/EUR-Lex/test.txt
+data_name: EUR-Lex
 min_vocab_freq: 1
 max_seq_length: 128
 include_test_labels: true
@@ -11,16 +11,17 @@ sparse: false
 
 # train
 seed: 777
-epochs: 50
-batch_size: 96
+epochs: 80
+batch_size: 64
 optimizer: adamw
 learning_rate: 0
-learning_rate_encoder: ['grid_search', [0.00005, 0.00007]]
-learning_rate_classifier: ['grid_search', [0.001, 0.005, 0.01]]
+learning_rate_encoder: ['grid_search', [0.00001, 0.00003, 0.00005, 0.0001]]
+learning_rate_classifier: ['grid_search', [0.0001, 0.0005, 0.001, 0.003, 0.005, 0.01, 0.05]]
+
 
 momentum: 0
-weight_decay: 0.001
-patience: 5
+weight_decay: 0.01
+patience: 10
 early_stopping_metric: P@1
 shuffle: true
 val_size: 0.05
@@ -29,7 +30,7 @@ precision: 32
 # scheduler - COSINE WITH WARMUP
 lr_scheduler: cosine_schedule_with_warmup
 scheduler_config:
-  warmup_steps: 3000
+  warmup_ratio: 0.1
 
 # eval
 eval_batch_size: 256
@@ -42,9 +43,7 @@ loss_function: binary_cross_entropy_with_logits
 init_weight: null
 network_config:
   lm_weight: sentence-transformers/all-MiniLM-L12-v2
-  hidden_dropout_prob: 0.1
-  attention_probs_dropout_prob: 0.1
-  post_encoder_dropout: 0.1
+  post_encoder_dropout: ['grid_search', [0.1, 0.3]]
 
 # pretrained vocab / embeddings
 vocab_file: null
@@ -72,5 +71,5 @@ limit_test_batches: 1.0
 metric_threshold: 0.5
 result_dir: runs
 save_k_predictions: 0
-silent: false
+silent: true
 embed_cache_dir: null
