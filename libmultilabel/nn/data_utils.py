@@ -102,12 +102,19 @@ def tokenize(text):
     return [t.lower() for t in tokenizer.tokenize(text) if not t.isnumeric()]
 
 
-def generate_batch(data_batch):
+def generate_batch(data_batch, min_text_len=-1):
     text_list = [data["text"] for data in data_batch]
     label_list = [data["label"] for data in data_batch]
     length_list = [len(data["text"]) for data in data_batch]
+
+    text = pad_sequence(text_list, batch_first=True)
+
+    if text.size(1) < min_text_len:
+        extra = text.new_full((text.size(0), min_text_len - text.size(1)))
+        text = torch.cat([text, extra], dim=1)
+
     return {
-        "text": pad_sequence(text_list, batch_first=True),
+        "text": text,
         "label": torch.stack(label_list),
         "length": torch.IntTensor(length_list),
     }
@@ -125,6 +132,7 @@ def get_dataset_loader(
     *,
     tokenizer=None,
     word_dict=None,
+    min_text_len=None
 ):
     """Create a pytorch DataLoader.
 
@@ -147,12 +155,17 @@ def get_dataset_loader(
     dataset = TextDataset(
         data, classes, max_seq_length, word_dict=word_dict, tokenizer=tokenizer, add_special_tokens=add_special_tokens
     )
+
+    collate = generate_batch
+    if min_text_len:
+        collate = partial(generate_batch, min_text_len=min_text_len)
+
     dataset_loader = torch.utils.data.DataLoader(
         dataset,
         batch_size=batch_size,
         shuffle=shuffle,
         num_workers=data_workers,
-        collate_fn=generate_batch,
+        collate_fn=collate,
         pin_memory="cuda" in device.type,
     )
     return dataset_loader
