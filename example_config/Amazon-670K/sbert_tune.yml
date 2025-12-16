@@ -11,8 +11,8 @@ sparse: false
 
 # train
 seed: 777
-epochs: 50
-batch_size: 96
+epochs: 100
+batch_size: 256
 optimizer: adamw
 learning_rate: 0
 learning_rate_encoder: ['grid_search', [0.00005, 0.00007]]

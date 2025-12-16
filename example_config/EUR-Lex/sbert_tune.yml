@@ -11,8 +11,8 @@ sparse: false
 
 # train
 seed: 777
-epochs: 80
-batch_size: 64
+epochs: 100
+batch_size: 512
 optimizer: adamw
 learning_rate: 0
 learning_rate_encoder: ['grid_search', [0.00001, 0.00003, 0.00005, 0.0001]]
@@ -21,7 +21,7 @@ learning_rate_classifier: ['grid_search', [0.0001, 0.0005, 0.001, 0.003, 0.005, 
 
 momentum: 0
 weight_decay: 0.01
-patience: 10
+patience: 7
 early_stopping_metric: P@1
 shuffle: true
 val_size: 0.05

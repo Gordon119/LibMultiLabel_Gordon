@@ -11,8 +11,8 @@ sparse: false
 
 # train
 seed: 777
-epochs: 50
-batch_size: 96
+epochs: 100
+batch_size: 512
 optimizer: adamw
 learning_rate: 0
 learning_rate_encoder: ['grid_search', [0.00005, 0.00007]]
@@ -29,7 +29,7 @@ precision: 32
 # scheduler - COSINE WITH WARMUP
 lr_scheduler: cosine_schedule_with_warmup
 scheduler_config:
-  warmup_steps: 3000
+  warmup_ratio: 0.01
 
 # eval
 eval_batch_size: 256
