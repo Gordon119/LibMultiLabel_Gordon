@@ -1,0 +1,49 @@
+# data
+training_file: data/Amazon-670K/train.txt
+test_file: data/Amazon-670K/test.txt
+data_name: Amazon-670K
+min_vocab_freq: 1
+max_seq_length: 512
+include_test_labels: true
+remove_no_label_data: true
+add_special_tokens: true
+sparse: false
+
+# train
+seed: 777
+epochs: 70
+batch_size: 16
+optimizer_encoder: adam
+optimizer_classifier: sgd
+learning_rate: 0
+learning_rate_encoder: 0.00004
+learning_rate_classifier: 0.01
+
+momentum: 0.9
+weight_decay_encoder: 0.001
+weight_decay_classifier: 0.001
+shuffle: true
+val_size: 0
+precision: 32
+
+# scheduler - COSINE WITH WARMUP
+lr_scheduler: cosine_schedule_with_warmup
+scheduler_config:
+  warmup_steps: 10000
+
+# model - MiniLM
+model_name: SBERT
+loss_function: binary_cross_entropy_with_logits
+init_weight: null
+network_config:
+  lm_weight: sentence-transformers/all-roberta-large-v1
+  post_encoder_dropout: 0.8
+
+# pretrained vocab / embeddings
+vocab_file: null
+embed_file: null
+normalize_embed: false
+
+# ensemble
+ensemble: false
+sample_rate: 0
