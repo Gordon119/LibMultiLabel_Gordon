@@ -164,7 +164,8 @@ class TorchTrainer:
             limit_test_batches=config.limit_test_batches,
             save_checkpoints=save_checkpoints,
             precision=config.get("precision", "32"),
-            logger=wandb_logger
+            logger=wandb_logger,
+            accumulate_grad_batches=config.get("accumulate_grad_batches", 1), 
         )
         callbacks = [callback for callback in self.trainer.callbacks if isinstance(callback, ModelCheckpoint)]
         self.checkpoint_callback = callbacks[0] if callbacks else None

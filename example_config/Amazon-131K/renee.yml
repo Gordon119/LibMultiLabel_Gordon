@@ -12,11 +12,12 @@ sparse: false
 # train
 seed: 777
 epochs: 100
-batch_size: 32
+batch_size: 256
+accumulate_grad_batches: 2
 optimizer_encoder: adam
 optimizer_classifier: sgd
 learning_rate: 0
-learning_rate_encoder: 0.0001
+learning_rate_encoder: 0.00001
 learning_rate_classifier: 0.05
 
 momentum: 0.9
@@ -37,7 +38,8 @@ loss_function: binary_cross_entropy_with_logits
 init_weight: null
 network_config:
   lm_weight: sentence-transformers/msmarco-distilbert-base-v4
-  post_encoder_dropout: 0.75
+  post_encoder_dropout: 0.85
+  encoder_ckpt_path: /home/gordon1109/LibMultiLabel_Gordon/ngame_pretrained_models/LF-Amazon-131K-Aug/state_dict.pt
 
 # pretrained vocab / embeddings
 vocab_file: null

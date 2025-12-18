@@ -1,3 +1,5 @@
+from collections import OrderedDict
+import torch
 import torch.nn as nn
 from transformers import AutoModel
 
@@ -6,7 +8,6 @@ class SDistilBERT(nn.Module):
     """
     SentenceTransformer backbone using token-ID inputs (HuggingFace AutoModel)
     with mean pooling + custom classification head.
-    Same input/output structure as your original BERT class.
     """
 
     def __init__(
@@ -14,6 +15,9 @@ class SDistilBERT(nn.Module):
         num_classes,
         post_encoder_dropout=0.1,
         lm_weight="sentence-transformers/msmarco-distilbert-base-v4",
+        encoder_ckpt_path="",
+        encoder_prefix_to_strip="embedding_labels.encoder.transformer.0.auto_model.",
+        strict_encoder=True,
         **kwargs,
     ):
         super().__init__()
@@ -26,10 +30,34 @@ class SDistilBERT(nn.Module):
         self.dropout = nn.Dropout(post_encoder_dropout)
         self.classifier = nn.Linear(hidden, num_classes)
 
+        if encoder_ckpt_path:
+            self._load_encoder_from_path(
+                encoder_ckpt_path,
+                prefix_to_strip=encoder_prefix_to_strip,
+                strict=strict_encoder,
+            )
+
+    def _load_encoder_from_path(self, path, prefix_to_strip="", strict=True):
+        print(f"Using pretrained encoder. Loading from {path}")
+
+        old_state_dict = torch.load(path, map_location="cpu", weights_only=False)
+        new_state_dict = OrderedDict()
+
+        for k, v in old_state_dict.items():
+            name = k.replace("embedding_labels.encoder.transformer.0.auto_model.", "")
+            new_state_dict[name] = v
+
+        missing, unexpected = self.lm.load_state_dict(new_state_dict, strict=strict)
+        print("Encoder load_state_dict done.")
+        if missing:
+            print(f"  Missing keys ({len(missing)}): {missing[:10]}{' ...' if len(missing) > 10 else ''}")
+        if unexpected:
+            print(f"  Unexpected keys ({len(unexpected)}): {unexpected[:10]}{' ...' if len(unexpected) > 10 else ''}")
+
     def mean_pooling(self, model_output, attention_mask):
         last_hidden = model_output.last_hidden_state
         mask_expanded = attention_mask.unsqueeze(-1).float()
-        pooled = (last_hidden * mask_expanded).sum(1) / mask_expanded.sum(1)
+        pooled = (last_hidden * mask_expanded).sum(1) / mask_expanded.sum(1).clamp(min=1e-9)
         return pooled
 
     def forward(self, input):
