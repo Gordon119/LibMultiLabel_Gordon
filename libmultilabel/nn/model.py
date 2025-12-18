@@ -16,9 +16,15 @@ class MultiLabelModel(L.LightningModule):
     Args:
         num_classes (int): Total number of classes.
         learning_rate (float, optional): Learning rate for optimizer. Defaults to 0.0001.
-        optimizer (str, optional): Optimizer name (i.e., sgd, adam, or adamw). Defaults to 'adam'.
+        learning_rate_encoder (float, optional): Learning rate for encoder params. Defaults to None.
+        learning_rate_classifier (float, optional): Learning rate for classifier params. Defaults to None.
+        optimizer (str, optional): Optimizer name (i.e., sgd, adam, adamw, adamax). Defaults to 'adam'.
+        optimizer_encoder (str, optional): Optimizer name for encoder params. Defaults to None (falls back to optimizer).
+        optimizer_classifier (str, optional): Optimizer name for classifier params. Defaults to None (falls back to optimizer).
         momentum (float, optional): Momentum factor for SGD only. Defaults to 0.9.
-        weight_decay (int, optional): Weight decay factor. Defaults to 0.
+        weight_decay (float, optional): Weight decay factor. Defaults to 0.
+        weight_decay_encoder (float, optional): Weight decay for encoder params. Defaults to None (falls back to weight_decay).
+        weight_decay_classifier (float, optional): Weight decay for classifier params. Defaults to None (falls back to weight_decay).
         metric_threshold (float, optional): The decision value threshold over which a label is predicted as positive. Defaults to 0.5.
         monitor_metrics (list, optional): Metrics to monitor while validating. Defaults to None.
         log_path (str): Path to a directory holding the log files and models.
@@ -34,8 +40,12 @@ class MultiLabelModel(L.LightningModule):
         learning_rate_encoder=None,
         learning_rate_classifier=None,
         optimizer="adam",
+        optimizer_encoder=None,
+        optimizer_classifier=None,
         momentum=0.9,
         weight_decay=0,
+        weight_decay_encoder=None,
+        weight_decay_classifier=None,
         lr_scheduler=None,
         scheduler_config=None,
         val_metric=None,
@@ -54,8 +64,12 @@ class MultiLabelModel(L.LightningModule):
         self.learning_rate_encoder = learning_rate_encoder
         self.learning_rate_classifier = learning_rate_classifier
         self.optimizer = optimizer
+        self.optimizer_encoder = optimizer_encoder
+        self.optimizer_classifier = optimizer_classifier
         self.momentum = momentum
         self.weight_decay = weight_decay
+        self.weight_decay_encoder = weight_decay_encoder
+        self.weight_decay_classifier = weight_decay_classifier
 
         # lr_scheduler
         self.lr_scheduler = lr_scheduler
@@ -72,88 +86,142 @@ class MultiLabelModel(L.LightningModule):
         top_k = 1 if self.multiclass else None
         self.eval_metric = get_metrics(metric_threshold, monitor_metrics, num_classes, top_k=top_k)
 
+        self.automatic_optimization = True
+
     @abstractmethod
     def shared_step(self, batch):
         """Return loss and predicted logits."""
         return NotImplemented
 
     def configure_optimizers(self):
-        """Initialize an optimizer for the free parameters of the network."""
-        if self.learning_rate_classifier and self.learning_rate_encoder:
-            # Separate parameter groups
+        def build_optimizer(opt_name, params, lr, wd):
+            if opt_name == "sgd":
+                return optim.SGD(params, lr=lr, momentum=self.momentum, weight_decay=wd)
+            elif opt_name == "adam":
+                return optim.Adam(params, lr=lr, weight_decay=wd)
+            elif opt_name == "adamw":
+                return optim.AdamW(params, lr=lr, weight_decay=wd)
+            elif opt_name == "adamax":
+                return optim.Adamax(params, lr=lr, weight_decay=wd)
+            else:
+                raise RuntimeError(f"Unsupported optimizer: {opt_name}")
+
+        split_needed = any(
+            x is not None
+            for x in [
+                self.learning_rate_encoder,
+                self.learning_rate_classifier,
+                self.optimizer_encoder,
+                self.optimizer_classifier,
+                self.weight_decay_encoder,
+                self.weight_decay_classifier,
+            ]
+        )
+
+        if split_needed:
+            # Split parameters
             encoder_params = []
             classifier_params = []
             for name, param in self.named_parameters():
                 if not param.requires_grad:
                     continue
-                if "encoder" in name or "distilbert" in name or "transformer" in name:
+                if "encoder" in name or "distilbert" in name or "transformer" in name or "lm" in name:
                     encoder_params.append(param)
                 else:
                     classifier_params.append(param)
-            parameters = [
-                {"params": encoder_params, "lr": self.learning_rate_encoder},
-                {"params": classifier_params, "lr": self.learning_rate_classifier},
-            ]
+
+            enc_lr = self.learning_rate_encoder if self.learning_rate_encoder is not None else self.learning_rate
+            cls_lr = self.learning_rate_classifier if self.learning_rate_classifier is not None else self.learning_rate
+
+            enc_wd = self.weight_decay_encoder if self.weight_decay_encoder is not None else self.weight_decay
+            cls_wd = self.weight_decay_classifier if self.weight_decay_classifier is not None else self.weight_decay
+
+            enc_opt_name = self.optimizer_encoder if self.optimizer_encoder is not None else self.optimizer
+            cls_opt_name = self.optimizer_classifier if self.optimizer_classifier is not None else self.optimizer
+
+            if enc_opt_name == cls_opt_name:
+                parameters = [
+                    {"params": encoder_params, "lr": enc_lr, "weight_decay": enc_wd},
+                    {"params": classifier_params, "lr": cls_lr, "weight_decay": cls_wd},
+                ]
+                optimizer = build_optimizer(enc_opt_name, parameters, lr=self.learning_rate, wd=self.weight_decay)
+                optimizers_list = None
+                base_optimizer_for_scheduler = optimizer
+            else:
+                self.automatic_optimization = False
+                opt_enc = build_optimizer(enc_opt_name, encoder_params, enc_lr, enc_wd)
+                opt_cls = build_optimizer(cls_opt_name, classifier_params, cls_lr, cls_wd)
+                optimizers_list = [opt_enc, opt_cls]
+                base_optimizer_for_scheduler = None
         else:
             parameters = [p for p in self.parameters() if p.requires_grad]
-        optimizer_name = self.optimizer
-        if optimizer_name == "sgd":
-            optimizer = optim.SGD(
-                parameters, self.learning_rate, momentum=self.momentum, weight_decay=self.weight_decay
-            )
-        elif optimizer_name == "adam":
-            optimizer = optim.Adam(parameters, weight_decay=self.weight_decay, lr=self.learning_rate)
-        elif optimizer_name == "adamw":
-            optimizer = optim.AdamW(parameters, weight_decay=self.weight_decay, lr=self.learning_rate)
-        elif optimizer_name == "adamax":
-            optimizer = optim.Adamax(parameters, weight_decay=self.weight_decay, lr=self.learning_rate)
-        else:
-            raise RuntimeError("Unsupported optimizer: {self.optimizer}")
+            optimizer = build_optimizer(self.optimizer, parameters, self.learning_rate, self.weight_decay)
+            optimizers_list = None
+            base_optimizer_for_scheduler = optimizer
 
         total_steps = self.trainer.estimated_stepping_batches
+
+        warmup_steps = 0
         if self.scheduler_config:
             warmup_ratio = self.scheduler_config.get("warmup_ratio", None)
-            warmup_steps = self.scheduler_config.get("warmup_steps", None)
+            warmup_steps_cfg = self.scheduler_config.get("warmup_steps", None)
             if warmup_ratio is not None:
                 warmup_steps = int(total_steps * warmup_ratio)
+            elif warmup_steps_cfg is not None:
+                warmup_steps = int(warmup_steps_cfg)
 
-        if self.lr_scheduler:
+        def build_scheduler(opt):
+            cfg = dict(self.scheduler_config or {})
             if self.lr_scheduler == "ReduceLROnPlateau":
-                lr_scheduler_config = {
+                return {
                     "scheduler": optim.lr_scheduler.ReduceLROnPlateau(
-                        optimizer, mode="min" if self.val_metric == "Loss" else "max", **dict(self.scheduler_config)
+                        opt, mode="min" if self.val_metric == "Loss" else "max", **cfg
                     ),
                     "monitor": self.val_metric,
                 }
             elif self.lr_scheduler == "linear_schedule_with_warmup":
                 scheduler = get_linear_schedule_with_warmup(
-                    optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps
+                    opt, num_warmup_steps=warmup_steps, num_training_steps=total_steps
                 )
-
-                lr_scheduler_config = {
-                    "scheduler": scheduler,
-                    "interval": "step",
-                    "frequency": 1,
-                }
-            elif self.lr_scheduler == "cosine_schedule_with_warmup":                
+                return {"scheduler": scheduler, "interval": "step", "frequency": 1}
+            elif self.lr_scheduler == "cosine_schedule_with_warmup":
                 scheduler = get_cosine_schedule_with_warmup(
-                    optimizer,
-                    num_warmup_steps=warmup_steps,
-                    num_training_steps=total_steps
+                    opt, num_warmup_steps=warmup_steps, num_training_steps=total_steps
                 )
-                
-                lr_scheduler_config = {
-                    "scheduler": scheduler,
-                    "interval": "step",
-                    "frequency": 1,
-                }
+                return {"scheduler": scheduler, "interval": "step", "frequency": 1}
             else:
-                raise RuntimeError("Unsupported learning rate scheduler: {self.lr_scheduler}")
-        return {"optimizer": optimizer, "lr_scheduler": lr_scheduler_config} if self.lr_scheduler else optimizer
+                raise RuntimeError(f"Unsupported learning rate scheduler: {self.lr_scheduler}")
+
+        if optimizers_list is None:
+            if self.lr_scheduler:
+                lr_scheduler_config = build_scheduler(base_optimizer_for_scheduler)
+                return {"optimizer": base_optimizer_for_scheduler, "lr_scheduler": lr_scheduler_config}
+            return base_optimizer_for_scheduler
+        else:
+            if self.lr_scheduler:
+                lr_scheduler_config = [build_scheduler(o) for o in optimizers_list]
+                return {"optimizer": optimizers_list, "lr_scheduler": lr_scheduler_config}
+            return optimizers_list
 
     def training_step(self, batch, batch_idx):
         loss, _ = self.shared_step(batch)
-        
+
+        if not self.automatic_optimization:
+            opt_enc, opt_cls = self.optimizers()
+            opt_enc.zero_grad()
+            opt_cls.zero_grad()
+            self.manual_backward(loss)
+            opt_enc.step()
+            opt_cls.step()
+
+            # step "per-step" schedulers manually
+            if self.lr_scheduler in ("linear_schedule_with_warmup", "cosine_schedule_with_warmup"):
+                scheds = self.lr_schedulers()
+                if not isinstance(scheds, (list, tuple)):
+                    scheds = [scheds]
+                for s in scheds:
+                    s.step()
+
         # record train loss vs epoch
         self.log(
             "train/loss",

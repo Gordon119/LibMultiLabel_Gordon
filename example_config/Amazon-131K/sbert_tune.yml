@@ -29,7 +29,7 @@ precision: 32
 # scheduler - COSINE WITH WARMUP
 lr_scheduler: cosine_schedule_with_warmup
 scheduler_config:
-  warmup_ratio: 0.01
+  warmup_steps: 3000
 
 # eval
 eval_batch_size: 256

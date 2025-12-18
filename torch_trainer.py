@@ -251,8 +251,12 @@ class TorchTrainer:
                 learning_rate_encoder=self.config.get("learning_rate_encoder", None),
                 learning_rate_classifier=self.config.get("learning_rate_classifier", None),
                 optimizer=self.config.optimizer,
+                optimizer_encoder=self.config.get("optimizer_encoder", None),
+                optimizer_classifier=self.config.get("optimizer_classifier", None),
                 momentum=self.config.momentum,
                 weight_decay=self.config.weight_decay,
+                weight_decay_encoder=self.config.get("weight_decay_encoder", None),
+                weight_decay_classifier=self.config.get("weight_decay_classifier", None),
                 lr_scheduler=self.config.lr_scheduler,
                 scheduler_config=self.config.scheduler_config,
                 val_metric=self.config.val_metric,
@@ -344,6 +348,7 @@ class TorchTrainer:
             print(f"{name}: {size_gb:.4f} GB")
 
         for name, p in self.model.named_parameters():
+            print(name)
             if not p.requires_grad:
                 continue
             if "embed" in name or "embedding" in name:

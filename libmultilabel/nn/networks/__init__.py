@@ -2,6 +2,7 @@ import torch.nn as nn
 
 from .bert import BERT
 from .distilbert import DistilBERT
+from .sdistilbert import SDistilBERT
 from .deberta import DeBERTa
 from .sbert import SBERT
 from .bert_attention import BERTAttention
